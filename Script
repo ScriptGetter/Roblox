@@ -1,0 +1,31 @@
+local Library = loadstring(Game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))()
+
+local Window = Library:NewWindow("🎲 Pets Go (NEW)")
+
+local FarmingCheats = Window:NewSection("Main")
+
+FarmingCheats:CreateButton("Banana Hub (OP 💀)", function()
+loadstring(game:HttpGet("https://rawscripts.net/raw/PETS-GO!-NEW-BEST-FREE-KEYLESS-SCRIPT-BANANA-HUB-20777"))()
+print("Script Executed")
+
+end)
+
+FarmingCheats:CreateButton("Rinns Hub (OP 💀)", function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/SkibidiCen/MainMenu/main/Code"))()
+print("Script Executed")
+
+end)
+
+local FarmingCheats = Window:NewSection("Misc")
+
+FarmingCheats:CreateTextbox("Subscribe", function(text)
+
+        print(text)
+
+end)
+
+FarmingCheats:CreateTextbox("Thank You For Using! ", function(text)
+
+        print(text)
+
+end)
