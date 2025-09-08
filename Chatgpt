@@ -201,39 +201,55 @@ flyVelocity.Enabled = false
 
 -- Feature Loop
 spawn(function()
+spawn(function()
     while true do
         wait(0.1)
         -- Auto Walk
-        if Features["Auto Walk"] then hrp.CFrame = hrp.CFrame + hrp.CFrame.LookVector*0.5 end
+        if Features["Auto Walk"] then 
+            hrp.CFrame = hrp.CFrame + hrp.CFrame.LookVector * 0.5 
+        end
+
         -- Auto Jump
-        if Features["Auto Jump"] and hum.FloorMaterial~=Enum.Material.Air then hum.Jump=true end
+        if Features["Auto Jump"] and hum.FloorMaterial ~= Enum.Material.Air then 
+            hum.Jump = true 
+        end
+
         -- Speed Boost
         hum.WalkSpeed = Features["Speed Boost"] and 50 or 16
+
         -- Fly Mode
         if Features["Fly Mode"] then
             flying = true
             flyVelocity.Enabled = true
             local cam = workspace.CurrentCamera
-            flyVelocity.Velocity = cam.CFrame.LookVector*FlySpeed
+            flyVelocity.Velocity = cam.CFrame.LookVector * FlySpeed
         else
             flying = false
             flyVelocity.Enabled = false
         end
+
         -- Teleport Fun
-        if Features["Teleport Fun"] and math.random(1,50)==1 then
+        if Features["Teleport Fun"] and math.random(1,50) == 1 then
             hrp.CFrame = hrp.CFrame + Vector3.new(math.random(-10,10),0,math.random(-10,10))
         end
+
         -- Teleport to Player
         if Features["Teleport to Player"] then
             local targetName = teleportInput.Value
             local target = targetName and Players:FindFirstChild(targetName)
-            if target then teleportToPlayer(target) end
+            if target then 
+                teleportToPlayer(target) 
+            end
         end
+
         -- Teleport to Game
         if Features["Teleport to Game"] then
             local gameId = tonumber(teleportInput.Value)
-            if gameId then teleportToGame(gameId) end
+            if gameId then 
+                teleportToGame(gameId) 
+            end
         end
+
         -- Follow Player
         if Features["Follow Player"] then
             local targetName = teleportInput.Value
@@ -242,6 +258,8 @@ spawn(function()
                 hrp.CFrame = hrp.CFrame:Lerp(target.Character.HumanoidRootPart.CFrame + Vector3.new(0,5,0),0.1)
             end
         end
+    end
+end)
 -- Dance / Emotes Automation
 local emotes = {"Wave","Dance","Laugh","Cheer","Point"}
 spawn(function()
