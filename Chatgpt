@@ -1,0 +1,329 @@
+-- FunBot Hub Ultimate v2
+-- Author: You
+-- Features: Offline/Online ChatGPT, Teleport, Fly, Auto Emotes, Particles, Speed/Jump Presets, Player Info, Config Save/Load
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+-- Load Fluent UI
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local Window = Fluent:CreateWindow({
+    Title = "FunBot Hub Ultimate",
+    SubTitle = "Offline + Online ChatGPT",
+    TabWidth = 180,
+    Size = UDim2.fromOffset(800, 600),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main" }),
+    Player = Window:AddTab({ Title = "Player Details" }),
+    Chat = Window:AddTab({ Title = "ChatGPT" }),
+    Fun = Window:AddTab({ Title = "Fun Features" }),
+    Log = Window:AddTab({ Title = "Update Log" }),
+    Settings = Window:AddTab({ Title = "Settings" })
+}
+
+-- ===== Feature States =====
+local Features = {
+    ["Auto Walk"] = false,
+    ["Auto Jump"] = false,
+    ["Dance/Emotes"] = false,
+    ["Speed Boost"] = false,
+    ["Particles"] = false,
+    ["Teleport Fun"] = false,
+    ["Teleport to Player"] = false,
+    ["Teleport to Game"] = false,
+    ["Follow Player"] = false,
+    ["Fly Mode"] = false,
+    ["Auto Click Tool"] = false,
+}
+
+local SettingsData = {
+    WalkSpeed = 16,
+    JumpPower = 50,
+    ParticleColor = Color3.fromRGB(96, 205, 255),
+    ParticleSize = Vector3.new(1,1,1),
+    FPSDisplay = true,
+    PingDisplay = true,
+    ChatOnline = false
+}
+
+-- ===== Particle Setup =====
+local particle = Instance.new("ParticleEmitter")
+particle.Texture = "rbxassetid://243098098"
+particle.Lifetime = NumberRange.new(0.5,1)
+particle.Rate = 30
+particle.Speed = NumberRange.new(5,15)
+particle.Size = NumberSequence.new(1)
+particle.Enabled = false
+particle.Parent = hrp
+
+-- ===== ChatGPT Setup =====
+local Memory = {}
+local API_KEY = "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"
+
+local function getOfflineReply(msg)
+    local lower = string.lower(msg)
+    local reply = "Hmm, I don't know about that 😅"
+    local responses = {
+        hello = {"Hi there! 😎", "Hello! How’s it going?"},
+        hi = {"Hello! 👋", "Hi! Ready to have fun?"},
+        how = {"I’m feeling great today! 🎉", "All good, thanks for asking!"},
+        dance = {"Let’s dance! 💃", "Time to boogie! 🕺"},
+        joke = {"Why did the chicken cross the road? To get to the other side! 🐔", "I would tell you a construction joke… but I’m still working on it! 😆"},
+        name = {"I’m FunBot Ultimate 🤖", "Call me FunBot Hub Ultimate!"}
+    }
+    for k,v in pairs(responses) do
+        if string.find(lower,k) then
+            reply = v[math.random(1,#v)]
+            break
+        end
+    end
+    table.insert(Memory, {PlayerMessage=msg, BotReply=reply})
+    if #Memory>10 then table.remove(Memory,1) end
+    if #Memory>=2 and math.random()<0.3 then
+        reply = reply.." Also, you said: '"..Memory[#Memory-1].PlayerMessage.."' right?"
+    end
+    return reply
+end
+
+local function getOnlineReply(msg)
+    local url = "https://api.openai.com/v1/chat/completions"
+    local data = HttpService:JSONEncode({
+        model = "gpt-3.5-turbo",
+        messages = {
+            {role="system", content="You are a helpful Roblox assistant."},
+            {role="user", content=msg}
+        }
+    })
+    local headers = {
+        ["Content-Type"] = "application/json",
+        ["Authorization"] = "Bearer "..API_KEY
+    }
+    local success, response = pcall(function()
+        return HttpService:PostAsync(url, data, Enum.HttpContentType.ApplicationJson, false, headers)
+    end)
+    if success then
+        local decoded = HttpService:JSONDecode(response)
+        return decoded.choices[1].message.content
+    else
+        return "Error: "..tostring(response)
+    end
+end
+
+-- ===== Chat Tab UI =====
+local chatInput = Tabs.Chat:AddInput("ChatInput",{Title="Send Message",Placeholder="Type something..."})
+local chatOutput = Tabs.Chat:AddParagraph({Title="AI Response", Content="No messages yet."})
+local OnlineMode = Tabs.Chat:AddToggle("OnlineMode",{Title="Use Online ChatGPT", Default=false})
+local ChatActive = Tabs.Chat:AddToggle("ChatActive",{Title="Enable AI Chat", Default=false})
+
+chatInput:OnChanged(function(msg)
+    if ChatActive.Value and msg and msg~="" then
+        local reply
+        if OnlineMode.Value then
+            reply = getOnlineReply(msg)
+        else
+            reply = getOfflineReply(msg)
+        end
+        chatOutput:UpdateContent("You: "..msg.."\nBot: "..reply)
+    end
+end)
+
+-- ===== Player Details Tab =====
+local playerInfo = Tabs.Player:AddParagraph({Title="Player Details", Content="Loading..."})
+spawn(function()
+    while true do
+        wait(0.5)
+        local pos = hrp.Position
+        playerInfo:UpdateContent(string.format([[
+Username: %s
+Health: %d/%d
+WalkSpeed: %.1f
+JumpPower: %.1f
+Position: %.1f, %.1f, %.1f
+]],
+            player.Name,
+            hum.Health,
+            hum.MaxHealth,
+            hum.WalkSpeed,
+            hum.JumpPower,
+            pos.X, pos.Y, pos.Z
+        ))
+    end
+end)
+
+-- ===== Update Log Tab =====
+local updates = [[
+v2.0 - Ultimate FunBot Hub
+Features: Offline/Online ChatGPT, Teleport, Fly, Auto Emotes, Speed/Jump Presets, Particles, FPS/Ping, Config Save/Load
+]]
+Tabs.Log:AddParagraph({Title="Update Log", Content=updates})
+
+-- ===== Main Tab Features =====
+for name,_ in pairs(Features) do
+    local toggle = Tabs.Main:AddToggle(name,{Title=name,Default=false})
+    toggle:OnChanged(function(value)
+        Features[name] = value
+        if name=="Particles" then particle.Enabled=value end
+    end)
+end
+
+-- Teleport input
+local teleportInput = Tabs.Main:AddInput("TeleportInput",{Title="Target Player / GameID",Placeholder="Player Name or GameID"})
+
+local function teleportToPlayer(target)
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        hrp.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0,5,0)
+    end
+end
+
+local function teleportToGame(placeId)
+    TeleportService:Teleport(placeId,player)
+end
+
+-- Fly Mode Control
+local FlySpeed = 50
+local flying = false
+local flyVelocity = Instance.new("BodyVelocity")
+flyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+flyVelocity.Velocity = Vector3.new(0,0,0)
+flyVelocity.Parent = hrp
+flyVelocity.Enabled = false
+
+-- Feature Loop
+spawn(function()
+    while true do
+        wait(0.1)
+        -- Auto Walk
+        if Features["Auto Walk"] then hrp.CFrame = hrp.CFrame + hrp.CFrame.LookVector*0.5 end
+        -- Auto Jump
+        if Features["Auto Jump"] and hum.FloorMaterial~=Enum.Material.Air then hum.Jump=true end
+        -- Speed Boost
+        hum.WalkSpeed = Features["Speed Boost"] and 50 or 16
+        -- Fly Mode
+        if Features["Fly Mode"] then
+            flying = true
+            flyVelocity.Enabled = true
+            local cam = workspace.CurrentCamera
+            flyVelocity.Velocity = cam.CFrame.LookVector*FlySpeed
+        else
+            flying = false
+            flyVelocity.Enabled = false
+        end
+        -- Teleport Fun
+        if Features["Teleport Fun"] and math.random(1,50)==1 then
+            hrp.CFrame = hrp.CFrame + Vector3.new(math.random(-10,10),0,math.random(-10,10))
+        end
+        -- Teleport to Player
+        if Features["Teleport to Player"] then
+            local targetName = teleportInput.Value
+            local target = targetName and Players:FindFirstChild(targetName)
+            if target then teleportToPlayer(target) end
+        end
+        -- Teleport to Game
+        if Features["Teleport to Game"] then
+            local gameId = tonumber(teleportInput.Value)
+            if gameId then teleportToGame(gameId) end
+        end
+        -- Follow Player
+        if Features["Follow Player"] then
+            local targetName = teleportInput.Value
+            local target = targetName and Players:FindFirstChild(targetName)
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                hrp.CFrame = hrp.CFrame:Lerp(target.Character.HumanoidRootPart.CFrame + Vector3.new(0,5,0),0.1)
+            end
+        end
+-- Dance / Emotes Automation
+local emotes = {"Wave","Dance","Laugh","Cheer","Point"}
+spawn(function()
+    while true do
+        wait(1)
+        if Features["Dance/Emotes"] and hum.Health > 0 then
+            local emote = emotes[math.random(1,#emotes)]
+            local emoteEvent = game:GetService("ReplicatedStorage"):FindFirstChild("PlayEmote") -- adjust if game has different emote remote
+            if emoteEvent then
+                pcall(function()
+                    emoteEvent:FireServer(emote)
+                end)
+            end
+        end
+    end
+end)
+
+-- Auto Click / Tool Use
+spawn(function()
+    while true do
+        wait(0.2)
+        if Features["Auto Click Tool"] then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool and tool:FindFirstChild("Handle") then
+                pcall(function() tool:Activate() end)
+            end
+        end
+    end
+end)
+
+-- Particle Customization (optional in Fun tab)
+local particleColorPicker = Tabs.Fun:AddColorpicker("ParticleColor",{Title="Particle Color",Default=SettingsData.ParticleColor})
+particleColorPicker:OnChanged(function()
+    particle.Color = ColorSequence.new(particleColorPicker.Value)
+end)
+
+-- Speed / Jump Presets
+local speedSlider = Tabs.Fun:AddSlider("WalkSpeed",{Title="WalkSpeed",Min=16,Max=100,Default=16,Rounding=1})
+speedSlider:OnChanged(function(value)
+    SettingsData.WalkSpeed = value
+    if not Features["Speed Boost"] then
+        hum.WalkSpeed = value
+    end
+end)
+
+local jumpSlider = Tabs.Fun:AddSlider("JumpPower",{Title="JumpPower",Min=50,Max=200,Default=50,Rounding=1})
+jumpSlider:OnChanged(function(value)
+    SettingsData.JumpPower = value
+    hum.JumpPower = value
+end)
+
+-- FPS / Ping Display
+spawn(function()
+    local fpsLabel = Tabs.Fun:AddParagraph({Title="Performance",Content="Loading..."})
+    while wait(1) do
+        local fps = math.floor(1 / RunService.Heartbeat:Wait())
+        local ping = player:GetNetworkPing()*1000
+        if SettingsData.FPSDisplay and SettingsData.PingDisplay then
+            fpsLabel:UpdateContent(string.format("FPS: %d\nPing: %d ms", fps, ping))
+        elseif SettingsData.FPSDisplay then
+            fpsLabel:UpdateContent("FPS: "..fps)
+        elseif SettingsData.PingDisplay then
+            fpsLabel:UpdateContent("Ping: "..ping.." ms")
+        else
+            fpsLabel:UpdateContent("Performance display disabled")
+        end
+    end
+end)
+
+-- Configuration Save / Load
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:SetFolder("FunBotHubUltimate")
+InterfaceManager:SetFolder("FunBotHubUltimate")
+SaveManager:BuildConfigSection(Tabs.Settings)
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+
+-- Notification
+Fluent:Notify({
+    Title = "FunBot Hub Ultimate",
+    Content = "All features loaded! ChatGPT, Fly, Teleports, Emotes, and more are ready.",
+    Duration = 6
+})
